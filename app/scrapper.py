@@ -10,9 +10,8 @@ headers = {
 }
 
 URL = 'https://goal.co/'
-# TIMEZONE = 'Africa/Kampala'
 
-def goal1() -> dict:
+def goal() -> dict:
     data = []
     match = []
     req = requests.get(URL, headers=headers)
