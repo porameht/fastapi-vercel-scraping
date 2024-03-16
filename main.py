@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
-from pymongo import MongoClient
 from dotenv import load_dotenv
 import uvicorn
 import os
@@ -32,7 +31,7 @@ async def root():
 @app.get('/goal')
 async def get():
     try:
-        return await goal()
+        return goal()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
