@@ -1,76 +1,114 @@
-from datetime import datetime
-from typing import Any
-
-import requests
+import subprocess
+from typing import List, Dict, Any
 from bs4 import BeautifulSoup as Soup
-from pytz import timezone, UTC
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-}
+URL = 'https://goal1.co/'
 
-URL = 'https://goal.co/'
+def fetch_with_curl(url: str) -> str:
+    command = [
+        'curl',
+        '-H', "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
+        '-s',  # silent mode
+        url
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    return result.stdout
 
-def goal() -> dict:
+def format_string(s: str) -> str:
+    return ' '.join(s.replace('\xa0', ' ').split())
+
+def goal(index: int = 0) -> List[Dict[str, Any]]:
     data = []
-    match = []
-    req = requests.get(URL, headers=headers)
     
-    if req.status_code != 200:
-        return {'error': 'Failed to fetch data'}
+    print(f'Fetching data from Goal1.co (index: {index})')
+    html = fetch_with_curl(URL)
+    
+    soup = Soup(html, 'html.parser')
+    
+    # Find the todaytable
+    today_table = soup.find('div', id='todaytable')
+    
+    if not today_table:
+        print("Could not find the todaytable.")
+        return data
 
-    html = Soup(req.content, 'html.parser')
+    # Find all divs inside todaytable with 'border:1px #000 solid' in their style
+    target_divs = today_table.find_all('div', style=lambda value: value and 'border:1px #000 solid' in value)
+    
+    if not target_divs:
+        print("Could not find any div with border style.")
+        return data
+    
+    if index >= len(target_divs):
+        print(f"Index {index} is out of range. Only {len(target_divs)} divs found.")
+        return data
 
-    tbody_tags = html.find_all('tr')
+    target_div = target_divs[index]
+    tbody_tags = target_div.find_all('tr')
+
+    current_league = None
+    current_matches = []
 
     for tbody in tbody_tags:
+        league_td = tbody.find('td', class_='utable_league')
+        if league_td:
+            if current_league:
+                data.append({
+                    'date': format_string(target_div.find('strong').text) if target_div.find('strong') else None,
+                    'leagues': current_league,
+                    'matches': current_matches
+                })
+            current_league = format_string(league_td.text)
+            current_matches = []
+        else:
+            match = {}
+            for class_name, key in [
+                ('utable_f1 f', 'เวลา'),
+                ('utable_f2 f', 'เจ้าบ้าน'),
+                ('utable_f3 f classodds', 'ราคาบอล'),
+                ('utable_f4 f', 'ทีมเยือน'),
+                ('utable_f7 f', 'ครึี่งแรก'),
+                ('utable_f5 f classmore', 'ผลบอล'),
+                ('utable_f6 f', 'ทรรศนะฟุตบอลวันนี้')
+            ]:
+                td = tbody.find('td', class_=class_name)
+                if td:
+                    if class_name == 'utable_f4 f':
+                        span = td.find('span')
+                        match[key] = format_string(span.text if span else td.text)
+                    else:
+                        match[key] = format_string(td.text)
+            if match:
+                current_matches.append(match)
 
-        tb1 = tbody.find('td' , class_='utable_f1 f')
-        tb2 = tbody.find('td' , class_='utable_f2 f')
-        tb3 = tbody.find('td' , class_='utable_f3 f classodds')
-        tb4 = tbody.find('td' , class_='utable_f4 f')
-        tb5 = tbody.find('td' , class_='utable_f5 f classmore')
-        tb6 = tbody.find('td' , class_='utable_f6 f')
-        tb7 = tbody.find('td' , class_='utable_f7 f')
-        
-        if tb1 is not None:
-            tb1 = tb1.text.strip()
-        if tb2 is not None:
-            tb2 = tb2.text.strip()
-        if tb3 is not None:
-            tb3 = tb3.text.strip()
-        if tb4 is not None:
-            span_tag = tb4.find('span')
-            if span_tag is not None:
-                tb4 = span_tag.text.strip()
-        if tb5 is not None:
-            tb5 = tb5.text.strip()
-        if tb6 is not None:
-            tb6 = tb6.text.strip()
-        if tb7 is not None:
-            tb7 = tb7.text.strip()
-
-
-        if tb1 != None:
-            match.append({
-                'เวลา': tb1,
-                'เจ้าบ้าน': tb2,
-                'ราคาบอล': tb3,
-                'ทีมเยือน': tb4,
-                'ครึี่งแรก': tb7,
-                'ผลบอล': tb5,
-                'ทรรศนะฟุตบอลวันนี้': tb6
-            })
-            
-        td = tbody.find('td', class_='utable_league')
-        
-        if td is not None:
-            league_name = td.text.strip()
-            
-            data.append({
-                'league': league_name,
-                'matches': match
-            })
+    # Add the last league after the loop
+    if current_league:
+        data.append({
+            'date': format_string(target_div.find('strong').text) if target_div.find('strong') else None,
+            'leagues': current_league,
+            'matches': current_matches
+        })
             
     return data
 
+def main():
+    # Get data from the first div (index 0)
+    result = goal(0)
+    print("Data from the first div:")
+    for item in result:
+        print(f"Date: {item['date']}")
+        print(f"League: {item['leagues']}")
+        print(f"Number of matches: {len(item['matches'])}")
+        print("---")
+
+    # Uncomment the following lines to get data from the second div (index 1)
+    # result = goal(1)
+    # print("\nData from the second div:")
+    # for item in result:
+    #     print(f"Date: {item['date']}")
+    #     print(f"League: {item['leagues']}")
+    #     print(f"Number of matches: {len(item['matches'])}")
+    #     print("---")
+
+if __name__ == "__main__":
+    main()
