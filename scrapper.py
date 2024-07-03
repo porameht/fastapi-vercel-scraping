@@ -1,6 +1,7 @@
 import subprocess
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup as Soup
+from utils.thai_date_utils import ThaiDateConverter
 
 URL = 'https://goal1.co/'
 
@@ -19,6 +20,7 @@ def format_string(s: str) -> str:
 
 def goal(index: int = 0) -> List[Dict[str, Any]]:
     data = []
+    converter = ThaiDateConverter()
     
     print(f'Fetching data from Goal1.co (index: {index})')
     html = fetch_with_curl(URL)
@@ -54,7 +56,7 @@ def goal(index: int = 0) -> List[Dict[str, Any]]:
         if league_td:
             if current_league:
                 data.append({
-                    'date': format_string(target_div.find('strong').text) if target_div.find('strong') else None,
+                    'date': converter.to_utc_format(format_string(target_div.find('strong').text) if target_div.find('strong') else None),
                     'leagues': current_league,
                     'matches': current_matches
                 })
@@ -84,7 +86,7 @@ def goal(index: int = 0) -> List[Dict[str, Any]]:
     # Add the last league after the loop
     if current_league:
         data.append({
-            'date': format_string(target_div.find('strong').text) if target_div.find('strong') else None,
+            'date': converter.to_utc_format(format_string(target_div.find('strong').text) if target_div.find('strong') else None),
             'leagues': current_league,
             'matches': current_matches
         })
