@@ -157,4 +157,4 @@ class GoalDataSaver:
                 print(f"Processed {len(data)} items")
             except Exception as e:
                 print(f"Error processing goal data: {str(e)}")
-            await asyncio.sleep(30)  # Sleep for 30 seconds
+            await asyncio.sleep(60)  # Sleep for 30 seconds
