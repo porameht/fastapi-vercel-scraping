@@ -16,26 +16,6 @@ class GoalDataSaver:
         mongodb_db_name = os.getenv('MONGODB_DB_NAME')
         self.mongodb_client = MongoDB(mongodb_uri, mongodb_db_name)
         self.mongodb_client.db['matches_data'].create_index([('_id', 1), ('date', 1), ('league', 1)], unique=True)
-        self.first_match_started = False
-
-    async def check_first_match(self):
-        try:
-            bangkok_tz = pytz.timezone('Asia/Bangkok')
-            now = datetime.now(bangkok_tz)
-            today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-            first_match = self.mongodb_client.db['matches_data'].find_one({
-                'date': {'$gte': today}
-            }, sort=[('date', 1)])
-
-            if first_match and first_match['date'] <= now:
-                self.first_match_started = True
-                print(f"First match of the day has started: {first_match['home_team']} vs {first_match['away_team']}")
-            else:
-                self.first_match_started = False
-                print("First match of the day hasn't started yet.")
-        except Exception as e:
-            print(f"Error checking first match: {str(e)}")
 
     async def save_matches(self, data):
         try:
@@ -115,19 +95,9 @@ class GoalDataSaver:
     async def run(self):
         while True:
             try:
-                await self.check_first_match()
-                if self.first_match_started:
-                    data = goal(0)
-                    await self.save_matches(data)
-                    print(f"Processed {len(data)} items")
-                    await asyncio.sleep(30)  # Sleep for 30 seconds if first match has started
-                else:
-                    print("Waiting for the first match to start...")
-                    await asyncio.sleep(1800)  # Sleep for 30 minutes if first match hasn't started
+                data = goal(0)
+                await self.save_matches(data)
+                print(f"Processed {len(data)} items")
             except Exception as e:
                 print(f"Error processing goal data: {str(e)}")
-                await asyncio.sleep(30)  # Sleep for 30 seconds in case of error
-
-if __name__ == "__main__":
-    saver = GoalDataSaver()
-    asyncio.run(saver.run())
+            await asyncio.sleep(60)  # Sleep for 30 seconds

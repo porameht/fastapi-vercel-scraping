@@ -21,33 +21,10 @@ class GoalTelegramBot:
         self.bot = AsyncTeleBot(self.bot_token, parse_mode='HTML')
         self.last_scores = {}
         self.last_schedule_date = None
-        self.first_match_started = False
-
-    async def check_first_match(self):
-        try:
-            bangkok_tz = pytz.timezone('Asia/Bangkok')
-            now = datetime.now(bangkok_tz)
-            today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-            first_match = self.mongodb_client.db['matches_data'].find_one({
-                'date': {'$gte': today}
-            }, sort=[('date', 1)])
-
-            if first_match and first_match['date'] <= now:
-                self.first_match_started = True
-                print(f"First match of the day has started: {first_match['home_team']} vs {first_match['away_team']}")
-            else:
-                self.first_match_started = False
-                print("First match of the day hasn't started yet.")
-        except PyMongoError as e:
-            print(f"Error checking first match: {str(e)}")
 
     async def check_for_goals(self):
-        if not self.first_match_started:
-            print("Skipping goal check as first match hasn't started yet.")
-            return
-
         try:
+            # Get matches from the last 24 hours
             now = datetime.now(pytz.UTC)
             one_day_ago = now - timedelta(days=1)
             
@@ -58,6 +35,7 @@ class GoalTelegramBot:
             for match in matches:
                 match_id = match['_id']
                 current_score = match['score']
+                # await self.send_goal_notification(match)
 
                 if match_id in self.last_scores and self.last_scores[match_id] != current_score:
                     await self.send_goal_notification(match)
@@ -91,6 +69,7 @@ class GoalTelegramBot:
         elif away_score > previous_away_score:
             goal_message = f"🎉 {match['away_team']} ทำประตู! 🎉"
         
+        # สร้างข้อความพื้นฐาน
         base_message = (
             f"<b>{match['league']}</b>\n\n"
             f"⚽️ <b>{match['home_team']}</b> vs <b>{match['away_team']}</b>\n\n"
@@ -102,6 +81,7 @@ class GoalTelegramBot:
             f"🕒 <b>เริ่มเตะ:</b> {match['bangkok_time']}"
         )
 
+        # สร้างข้อความสุดท้ายโดยรวม goal_message ถ้ามี
         if goal_message:
             message = f"🚨 <b>GOAL ALERT!</b> 🚨\n\n{goal_message}\n\n{base_message}"
         else:
@@ -121,6 +101,7 @@ class GoalTelegramBot:
                 'date': {'$gte': today}
             }).sort([('league', 1), ('date', 1)]))
 
+            # Group matches by league
             grouped_matches = groupby(matches, key=lambda x: x['league'])
 
             for league, league_matches in grouped_matches:
@@ -156,12 +137,12 @@ class GoalTelegramBot:
 
     async def run(self):
         while True:
-            await self.check_first_match()
             await self.check_for_goals()
             
             bangkok_tz = pytz.timezone('Asia/Bangkok')
             now = datetime.now(bangkok_tz)
             
+            # Check if it's noon and we haven't sent the schedule today
             if now.hour == 12 and now.minute == 0 and (self.last_schedule_date is None or self.last_schedule_date < now.date()):
                 await self.send_daily_schedule()
 
