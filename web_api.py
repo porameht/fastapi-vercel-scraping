@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 import uvicorn
 import os
 
-from app.db.mongo import MongoDB
-from app.scrapper import goal
+from db.mongo import MongoDB
+from scrapper import goal
 
 load_dotenv()
 class Item(BaseModel):

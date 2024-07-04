@@ -20,6 +20,7 @@ class GoalTelegramBot:
         self.group_id = os.getenv('TELEGRAM_GROUP_ID')
         self.bot = AsyncTeleBot(self.bot_token, parse_mode='HTML')
         self.last_scores = {}
+        self.last_schedule_date = None
 
     async def check_for_goals(self):
         try:
@@ -34,7 +35,7 @@ class GoalTelegramBot:
             for match in matches:
                 match_id = match['_id']
                 current_score = match['score']
-                await self.send_goal_notification(match)
+                # await self.send_goal_notification(match)
 
                 if match_id in self.last_scores and self.last_scores[match_id] != current_score:
                     await self.send_goal_notification(match)
@@ -110,6 +111,7 @@ class GoalTelegramBot:
                 await asyncio.sleep(1)  # Add a small delay between messages
 
             print("All league schedules sent successfully")
+            self.last_schedule_date = now.date()
         except Exception as e:
             print(f"Error sending daily schedules: {str(e)}")
 
@@ -123,6 +125,7 @@ class GoalTelegramBot:
                 f"🏠 <b>ทีมเหย้า:</b> {match['home_team']}\n"
                 f"🛫 <b>ทีมเยือน:</b> {match['away_team']}\n"
                 f"⚽ <b>ผลการแข่งขัน:</b> {match['score']}\n"
+                f"💰 <b>ราคาบอล:</b> {match['odds']}\n"
                 f"🔮 <b>ทรรศนะฟุตบอลวันนี้:</b> {match.get('signal', 'ไม่มีข้อมูล')}\n"
                 f"🕒 <b>เวลาเตะ:</b> {match['bangkok_time']}\n"
                 f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
@@ -135,7 +138,13 @@ class GoalTelegramBot:
     async def run(self):
         while True:
             await self.check_for_goals()
-            # await self.send_daily_schedule()
+            
+            bangkok_tz = pytz.timezone('Asia/Bangkok')
+            now = datetime.now(bangkok_tz)
+            
+            # Check if it's noon and we haven't sent the schedule today
+            if now.hour == 12 and now.minute == 0 and (self.last_schedule_date is None or self.last_schedule_date < now.date()):
+                await self.send_daily_schedule()
 
             await asyncio.sleep(60)  # Check every minute
 
