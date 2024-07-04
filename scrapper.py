@@ -1,19 +1,17 @@
-import subprocess
+import requests
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup as Soup
 from utils.thai_date_utils import ThaiDateConverter
 
 URL = 'https://goal1.co/'
 
-def fetch_with_curl(url: str) -> str:
-    command = [
-        'curl',
-        '-H', "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
-        '-s',  # silent mode
-        url
-    ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    return result.stdout
+def fetch_with_requests(url: str) -> str:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()  # This will raise an exception for HTTP errors
+    return response.text
 
 def format_string(s: str) -> str:
     return ' '.join(s.replace('\xa0', ' ').split())
@@ -23,7 +21,7 @@ def goal(index: int = 0) -> List[Dict[str, Any]]:
     converter = ThaiDateConverter()
     
     print(f'Fetching data from Goal1.co (index: {index})')
-    html = fetch_with_curl(URL)
+    html = fetch_with_requests(URL)
     
     soup = Soup(html, 'html.parser')
     
